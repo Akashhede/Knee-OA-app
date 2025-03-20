@@ -67,7 +67,7 @@ This project is licensed under the MIT License.
 
 The purpose of this project is to correctly classify the severity of osteoarthritis based on X-ray images.
 
-https://github.com/Akashhede/Knee-OA-app/blob/main/Knee%20OA/assets/streamlitapp_output.png?raw=true
+
 
 
 
