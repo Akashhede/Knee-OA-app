@@ -63,7 +63,8 @@ python app.py --image app/img/sample_image.png
 ## License
 This project is licensed under the MIT License.
 
----
+## Purpose
 
-Feel free to update the README with additional details, such as dataset sources, model architecture, or performance metrics!
+The purpose of this project is to correctly classify the severity of osteoarthritis based on X-ray images.
+
 
