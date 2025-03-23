@@ -5,7 +5,6 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 
-
 def make_gradcam_heatmap(grad_model, img_array, pred_index=None):
     with tf.GradientTape() as tape:
         last_conv_layer_output, preds = grad_model(img_array)
@@ -14,7 +13,6 @@ def make_gradcam_heatmap(grad_model, img_array, pred_index=None):
         class_channel = preds[:, pred_index]
 
     grads = tape.gradient(class_channel, last_conv_layer_output)
-
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
 
     last_conv_layer_output = last_conv_layer_output[0]
@@ -24,12 +22,9 @@ def make_gradcam_heatmap(grad_model, img_array, pred_index=None):
     heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
     return heatmap.numpy()
 
-
 def save_and_display_gradcam(img, heatmap, alpha=0.4):
     heatmap = np.uint8(255 * heatmap)
-
     jet = cm.get_cmap("jet")
-
     jet_colors = jet(np.arange(256))[:, :3]
     jet_heatmap = jet_colors[heatmap]
 
@@ -41,9 +36,7 @@ def save_and_display_gradcam(img, heatmap, alpha=0.4):
     superimposed_img = tf.keras.preprocessing.image.array_to_img(
         superimposed_img
     )
-
     return superimposed_img
-
 
 icon = Image.open("app/img/NGI.jpg")
 st.set_page_config(
@@ -52,11 +45,9 @@ st.set_page_config(
 )
 
 class_names = ["Healthy", "Doubtful", "Minimal", "Moderate", "Severe"]
-
 model = tf.keras.models.load_model("./model/model_Xception_ft.hdf5")
 target_size = (224, 224)
 
-# Grad-CAM
 grad_model = tf.keras.models.clone_model(model)
 grad_model.set_weights(model.get_weights())
 grad_model.layers[-1].activation = None
@@ -70,78 +61,63 @@ grad_model = tf.keras.models.Model(
 
 # Sidebar
 with st.sidebar:
-    st.image(icon)
-    st.subheader("Final Project - MDC013")
-    st.caption("=== Akash Hede ===")
-    st.caption("=== Abhijeet Jagtap ===")
-    st.caption("=== Aniruddha Bambole ===")
-    st.caption("=== Viraj Bodke ===")
+    st.markdown("## 📂 Upload an X-ray Image")
+    uploaded_file = st.file_uploader("Choose an image...", type=["png", "jpg", "jpeg"])
+    st.markdown("---")
+    st.markdown("### ℹ️ About This App")
+    st.write("This application analyzes knee X-ray images to determine the severity of arthrosis using Deep Learning.")
+    st.markdown("---")
 
-    st.subheader(":arrow_up: Upload image")
-    uploaded_file = st.file_uploader("Choose x-ray image")
-
-
-# Body
-st.header("Severity Analysis of Arthrosis in the Knee")
-
-col1, col2 = st.columns(2)
-y_pred = None
+# Main Page
+st.markdown("<h1 style='text-align: center; color: #2E86C1;'>Knee Arthrosis Severity Analysis</h1>", unsafe_allow_html=True)
 
 if uploaded_file is not None:
+    col1, col2 = st.columns([1, 1])
     with col1:
-        st.subheader(":camera: Input")
+        st.markdown("### 🖼️ Uploaded X-ray")
         st.image(uploaded_file, use_column_width=True)
-
-        img = tf.keras.preprocessing.image.load_img(
-            uploaded_file, target_size=target_size
-        )
+        img = tf.keras.preprocessing.image.load_img(uploaded_file, target_size=target_size)
         img = tf.keras.preprocessing.image.img_to_array(img)
         img_aux = img.copy()
 
-        if st.button(
-            ":arrows_counterclockwise: Predict Arthrosis in the Knee"
-        ):
-            img_array = np.expand_dims(img_aux, axis=0)
-            img_array = np.float32(img_array)
-            img_array = tf.keras.applications.xception.preprocess_input(
-                img_array
-            )
-
-            with st.spinner("Wait for it..."):
+        if st.button("🔍 Analyze X-ray", use_container_width=True):
+            with st.spinner("Processing image..."):
+                img_array = np.expand_dims(img_aux, axis=0)
+                img_array = np.float32(img_array)
+                img_array = tf.keras.applications.xception.preprocess_input(img_array)
                 y_pred = model.predict(img_array)
+                y_pred_percentage = 100 * y_pred[0]
+                predicted_class_index = np.argmax(y_pred_percentage)
+                predicted_class = class_names[predicted_class_index]
+                probability = y_pred_percentage[predicted_class_index]
 
-            y_pred = 100 * y_pred[0]
+            st.markdown(f"### ✅ **Severity Grade:** {predicted_class}")
+            st.markdown(f"### 📊 **Probability:** {probability:.2f}%")
 
-            probability = np.amax(y_pred)
-            number = np.where(y_pred == np.amax(y_pred))
-            grade = str(class_names[np.amax(number)])
-
-            st.subheader(":white_check_mark: Prediction")
-
-            st.metric(
-                label="Severity Grade:",
-                value=f"{class_names[np.amax(number)]} - {probability:.2f}%",
-            )
-
-    if y_pred is not None:
-        with col2:
-            st.subheader(":mag: Explainability")
+    with col2:
+        if 'y_pred_percentage' in locals():
+            st.markdown("### 🔥 Heatmap Visualization")
             heatmap = make_gradcam_heatmap(grad_model, img_array)
             image = save_and_display_gradcam(img, heatmap)
             st.image(image, use_column_width=True)
 
-            st.subheader(":bar_chart: Analysis")
-
-            fig, ax = plt.subplots(figsize=(5, 2))
-            ax.barh(class_names, y_pred, height=0.55, align="center")
-            for i, (c, p) in enumerate(zip(class_names, y_pred)):
-                ax.text(p + 2, i - 0.2, f"{p:.2f}%")
-            ax.grid(axis="x")
+            st.markdown("### 📈 Probability Distribution")
+            fig, ax = plt.subplots(figsize=(8, 4))
+            colors = ['#3498DB', '#2ECC71', '#F1C40F', '#E67E22', '#E74C3C']
+            bars = ax.barh(class_names, y_pred_percentage, height=0.6, align="center", color=colors)
+            for bar, p in zip(bars, y_pred_percentage):
+                ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height() / 2, f"{p:.2f}%", va='center', fontsize=11)
+            ax.grid(axis="x", linestyle='--', alpha=0.6)
             ax.set_xlim([0, 120])
             ax.set_xticks(range(0, 101, 20))
+            ax.set_xlabel("Probability (%)", fontsize=12)
+            ax.set_ylabel("Severity Grade", fontsize=12)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.tick_params(axis='both', which='major', labelsize=11)
             fig.tight_layout()
             st.pyplot(fig)
-
-
-
-            
+        else:
+            st.info("Please upload and analyze an X-ray image.")
+else:
+    st.warning("⚠️ Please upload an X-ray image to start the analysis.")
